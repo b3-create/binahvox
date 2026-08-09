@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BinahVox — CS Translate v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  :root{
+    --bg:#FAF9F6;
+    --surface:#FFFFFF;
+    --ink:#1C1B22;
+    --ink-muted:#6B6775;
+    --line:#E7E3DA;
+    --indigo:#2B2570;
+    --indigo-hover:#201B57;
+    --indigo-tint:#EEEDF9;
+    --clay:#C1723D;
+    --clay-hover:#A75F30;
+    --clay-tint:#FBEEE3;
+    --ok:#2E7D5B;
+    --err:#B54545;
+    --radius:14px;
+    --shadow: 0 1px 2px rgba(28,27,34,0.04), 0 8px 24px -12px rgba(28,27,34,0.14);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  ::selection{ background:var(--clay-tint); color:var(--ink); }
+
+  a{ color:var(--indigo); }
+
+  /* ---------- Header ---------- */
+  header{
+    background:var(--indigo);
+    color:#fff;
+    padding:1.1rem 2rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:0.85rem; }
+  .brand-mark{
+    width:42px; height:42px; border-radius:11px;
+    background:linear-gradient(155deg,var(--clay) 0%, #E39A63 100%);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-weight:700; font-size:1.15rem; color:#211A0E;
+    flex-shrink:0;
+  }
+  .brand-text h1{
+    font-family:'Fraunces',serif; font-weight:600; font-size:1.5rem;
+    letter-spacing:-0.01em; line-height:1;
+  }
+  .brand-text p{
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.09em;
+    color:#C7C3E8; margin-top:0.3rem; font-weight:600;
+  }
+  .header-nav{ display:flex; gap:0.4rem; }
+  .header-nav a{
+    color:#E4E2F5; text-decoration:none; font-size:0.85rem; font-weight:600;
+    padding:0.5rem 0.9rem; border-radius:8px; transition:background 0.15s;
+  }
+  .header-nav a:hover{ background:rgba(255,255,255,0.1); }
+
+  main{
+    padding:2.25rem 2rem 3rem;
+    max-width:1280px; width:100%; margin:0 auto;
+    display:flex; flex-direction:column; gap:2rem; flex:1;
+  }
+
+  .section-card{
+    background:var(--surface);
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    box-shadow:var(--shadow);
+    padding:1.85rem;
+    scroll-margin-top:1.5rem;
+  }
+  .section-head{ display:flex; align-items:baseline; gap:0.6rem; margin-bottom:0.35rem; }
+  .section-head .tag{
+    font-family:'JetBrains Mono',monospace; font-size:0.7rem; font-weight:500;
+    color:#fff; background:var(--indigo); padding:0.15rem 0.5rem; border-radius:5px;
+    letter-spacing:0.03em;
+  }
+  .section-card.bible .section-head .tag{ background:var(--clay); }
+  .section-head h2{
+    font-family:'Fraunces',serif; font-weight:600; font-size:1.35rem; color:var(--ink);
+  }
+  .section-sub{ color:var(--ink-muted); font-size:0.9rem; margin-bottom:1.5rem; line-height:1.5; }
+
+  /* ---------- Upload zone ---------- */
+  .upload-zone{
+    border:1.5px dashed var(--line);
+    border-radius:10px;
+    padding:1.1rem 1.25rem;
+    background:#FCFBF9;
+    margin-bottom:1.5rem;
+    display:flex; flex-direction:column; gap:0.9rem;
+    transition:border-color 0.15s, background 0.15s;
+  }
+  .upload-zone.drag-over{ border-color:var(--clay); background:var(--clay-tint); }
+  .upload-row{ display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; }
+  .upload-row label.field-label{ font-size:0.82rem; font-weight:600; color:var(--ink-muted); min-width:150px; }
+  .link-input-group{ display:flex; gap:0.5rem; flex:1; min-width:260px; }
+  .link-input-group input{ flex:1; }
+  .field-hint{ font-size:0.78rem; color:var(--ink-muted); margin-top:0.35rem; line-height:1.45; }
+  .field-hint.error{ color:var(--err); font-weight:500; }
+  .field-hint.success{ color:var(--ok); font-weight:500; }
+  .divider{ border-top:1px dashed var(--line); }
+
+  input[type="text"], input[type="password"], select{
+    padding:0.55rem 0.8rem;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    font-size:0.88rem; font-weight:500; color:var(--ink);
+    outline:none; transition:border-color 0.15s, box-shadow 0.15s;
+    font-family:'Inter',sans-serif;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, select:focus{
+    border-color:var(--indigo); box-shadow:0 0 0 3px var(--indigo-tint);
+  }
+  select{ cursor:pointer; }
+  .file-input-hidden{ display:none; }
+
+  /* ---------- Controls ---------- */
+  .control-bar{
+    display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;
+    background:#F4F2EE; padding:0.75rem 0.9rem; border-radius:10px; margin-bottom:1.1rem;
+  }
+  .control-bar label{ font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-muted); }
+  .swap-btn{
+    width:34px; height:34px; border-radius:50%; border:1px solid var(--line);
+    background:var(--surface); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-size:1rem; color:var(--indigo); transition:transform 0.2s, background 0.15s;
+  }
+  .swap-btn:hover{ background:var(--indigo-tint); transform:rotate(180deg); }
+
+  .btn{
+    padding:0.58rem 1.15rem; border:none; border-radius:8px;
+    background:var(--indigo); color:#fff; font-weight:600; font-size:0.87rem;
+    cursor:pointer; transition:background 0.15s, transform 0.1s;
+    display:inline-flex; align-items:center; gap:0.4rem; font-family:'Inter',sans-serif;
+  }
+  .btn:hover{ background:var(--indigo-hover); }
+  .btn:active{ transform:scale(0.98); }
+  .btn:disabled{ background:#B9B6C4; cursor:not-allowed; }
+  .btn-clay{ background:var(--clay); }
+  .btn-clay:hover{ background:var(--clay-hover); }
+  .btn-ghost{
+    background:transparent; color:var(--indigo); border:1px solid var(--line);
+  }
+  .btn-ghost:hover{ background:var(--indigo-tint); }
+  .btn-sm{ padding:0.4rem 0.8rem; font-size:0.8rem; }
+
+  /* ---------- Workspace ---------- */
+  .grid-workspace{ display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  .field-block h3{
+    font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--ink-muted); margin-bottom:0.5rem;
+  }
+  textarea{
+    width:100%; height:360px; padding:1.1rem;
+    border-radius:10px; border:1px solid var(--line); resize:vertical;
+    font-size:0.98rem; line-height:1.65; outline:none;
+    background:#FCFBF9; color:var(--ink); font-family:'Inter',sans-serif;
+    transition:border-color 0.15s, background 0.15s;
+  }
+  textarea:focus{ background:#fff; border-color:var(--indigo); }
+  textarea[readonly]{ background:#F7F6F2; cursor:text; }
+  .field-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; }
+  .word-count{ font-size:0.78rem; color:var(--ink-muted); font-family:'JetBrains Mono',monospace; }
+  .output-actions{ display:flex; gap:0.5rem; }
+  .icon-btn{
+    background:transparent; border:1px solid var(--line); border-radius:7px;
+    width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--ink-muted); transition:all 0.15s; font-size:0.95rem;
+  }
+  .icon-btn:hover{ border-color:var(--indigo); color:var(--indigo); background:var(--indigo-tint); }
+  .icon-btn.active{ background:var(--clay); border-color:var(--clay); color:#fff; }
+
+  /* ---------- Bible section ---------- */
+  .verse-toggle{ display:flex; gap:0.4rem; margin-bottom:1.25rem; background:#F4F2EE; padding:0.3rem; border-radius:9px; width:fit-content; }
+  .verse-toggle button{
+    border:none; background:transparent; padding:0.5rem 1rem; border-radius:7px;
+    font-size:0.83rem; font-weight:600; color:var(--ink-muted); cursor:pointer; transition:all 0.15s;
+  }
+  .verse-toggle button.active{ background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .verse-panel{ display:none; }
+  .verse-panel.active{ display:block; }
+
+  .ref-row{ display:flex; gap:0.6rem; margin-bottom:0.4rem; flex-wrap:wrap; }
+  .ref-row input{ flex:1; min-width:220px; }
+
+  .esv-result{
+    margin-top:1.25rem; padding:1.5rem 1.75rem; background:var(--clay-tint);
+    border-left:3px solid var(--clay); border-radius:0 10px 10px 0;
+    font-family:'Fraunces',serif; font-size:1.08rem; line-height:1.75; color:var(--ink);
+    display:none; white-space:pre-wrap;
+  }
+  .esv-result sup{ font-family:'JetBrains Mono',monospace; color:var(--clay-hover); font-weight:600; margin-right:0.1rem; }
+  .esv-copyright{ font-family:'Inter',sans-serif; font-size:0.72rem; color:var(--ink-muted); margin-top:1rem; line-height:1.5; }
+
+  .draft-note{
+    display:flex; gap:0.6rem; align-items:flex-start; background:#F4F2EE;
+    border-radius:9px; padding:0.9rem 1rem; font-size:0.82rem; color:var(--ink-muted);
+    margin-bottom:1.1rem; line-height:1.5;
+  }
+  .draft-note b{ color:var(--ink); }
+
+  details.api-key-box{ margin-top:1.25rem; border-top:1px solid var(--line); padding-top:1rem; }
+  details.api-key-box summary{
+    cursor:pointer; font-size:0.82rem; font-weight:600; color:var(--indigo); list-style:none;
+  }
+  details.api-key-box summary::-webkit-details-marker{ display:none; }
+  details.api-key-box summary::before{ content:"⚙ "; }
+  .api-key-row{ display:flex; gap:0.6rem; margin-top:0.75rem; flex-wrap:wrap; }
+  .api-key-row input{ flex:1; min-width:240px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:900px){
+    .grid-workspace{ grid-template-columns:1fr; }
+    main{ padding:1.25rem; }
+    header{ padding:1rem 1.25rem; }
+    .header-nav{ display:none; }
+  }
+
+  footer{
+    text-align:center; padding:1.75rem; font-size:0.78rem; color:#9E9AAA;
+    background:var(--indigo); margin-top:auto; font-weight:500;
+  }
+  footer a{ color:#C7C3E8; }
+
+  .sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">BV</div>
+      <div class="brand-text">
+        <h1>BinahVox</h1>
+        <p>CS Translate · v2</p>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <a href="#translate">Translate</a>
+      <a href="#scripture">Scripture</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="section-card" id="translate">
+      <div class="section-head"><span class="tag">01</span><h2>Document &amp; Text Translation</h2></div>
+      <p class="section-sub">Paste text, upload a file, or pull in a document link — then translate instantly, no sign-in required.</p>
+
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-row">
+          <label class="field-label">🔗 Document link</label>
+          <div class="link-input-group">
+            <input type="text" id="docUrlInput" placeholder="Paste a Google Docs link (set sharing to “Anyone with the link”)">
+            <button class="btn btn-clay btn-sm" onclick="fetchOnlineDocLink()">Load link</button>
+          </div>
+        </div>
+        <div id="linkStatus" class="field-hint"></div>
+        <div class="divider"></div>
+        <div class="upload-row">
+          <label class="field-label">📄 Upload a file</label>
+          <input type="file" id="fileAttachment" accept=".docx,.txt" class="file-input-hidden" onchange="handleFileUpload(this.files[0])">
+          <button class="btn btn-clay btn-sm" onclick="document.getElementById('fileAttachment').click()">Choose .docx / .txt</button>
+          <span id="fileNameDisplay" style="font-size:0.85rem; color:var(--ink-muted);">or drop a file here</span>
+        </div>
+      </div>
+
+      <div class="control-bar">
+        <label>From</label>
+        <select id="sourceLang">
+          <option value="id" selected>Indonesian</option>
+          <option value="en">English</option>
+          <option value="zh-CN">Mandarin</option>
+        </select>
+        <button class="swap-btn" onclick="swapLanguages()" title="Swap languages">⇄</button>
+        <label>To</label>
+        <select id="targetLang">
+          <option value="en" selected>English</option>
+          <option value="zh-CN">Mandarin</option>
+          <option value="id">Indonesian</option>
+        </select>
+        <button id="translateBtn" class="btn btn-clay" style="margin-left:auto;" onclick="executeNoKeyTranslation()">Translate text</button>
+      </div>
+
+      <div class="grid-workspace">
+        <div class="field-block">
+          <h3>Source text</h3>
+          <textarea id="sourceText" placeholder="Type or paste your text here — for example a customer message, an email thread, or a paragraph from a document." maxlength="100000" oninput="updateWordCount()"></textarea>
+          <div class="field-foot">
+            <span class="word-count"><span id="wordsCurrent">0</span> words</span>
+          </div>
+        </div>
+        <div class="field-block">
+          <h3>Translation</h3>
+          <textarea id="targetOutput" placeholder="Your translation will appear here — select all and copy whenever you're ready." readonly></textarea>
+          <div class="field-foot">
+            <span class="word-count" id="targetWordCount"></span>
+            <div class="output-actions">
+              <button class="icon-btn" id="listenBtn" onclick="toggleListen()" title="Listen to translation">🔊</button>
+              <button class="icon-btn" onclick="copyOutput()" title="Copy translation">⧉</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card bible" id="scripture">
+      <div class="section-head"><span class="tag">02</span><h2>Scripture Lookup <span style="font-weight:400; color:var(--ink-muted); font-size:0.95rem;">— Indonesian → English (ESV)</span></h2></div>
+      <p class="section-sub">Look up a verse by reference for the authoritative ESV wording, or paste Indonesian verse text for a quick draft translation.</p>
+
+      <div class="verse-toggle">
+        <button id="tabRef" class="active" onclick="switchVerseTab('ref')">By reference</button>
+        <button id="tabText" onclick="switchVerseTab('text')">By pasted text</button>
+      </div>
+
+      <div class="verse-panel active" id="panelRef">
+        <div class="ref-row">
+          <input type="text" id="verseRefInput" placeholder="e.g. Yohanes 3:16, or Mazmur 23:1-4">
+          <button class="btn btn-clay" onclick="lookupESV()">Look up ESV text</button>
+        </div>
+        <div class="field-hint">Type the reference in Indonesian or English — book names like <em>Yohanes</em>, <em>Mazmur</em>, or <em>Kejadian</em> are recognized automatically.</div>
+        <div id="esvResult" class="esv-result"></div>
+
+        <details class="api-key-box">
+          <summary>ESV API key (one-time setup)</summary>
+          <p class="field-hint" style="margin-top:0.5rem;">This looks up the real, licensed ESV® text via Crossway's official API. Get a free key at <a href="https://api.esv.org/account/create/" target="_blank" rel="noopener">api.esv.org</a>, then paste it below — it's saved only in this browser.</p>
+          <div class="api-key-row">
+            <input type="password" id="esvApiKey" placeholder="Paste your ESV API key">
+            <button class="btn btn-ghost btn-sm" onclick="saveESVKey()">Save key</button>
+          </div>
+          <div id="esvKeyStatus" class="field-hint"></div>
+        </details>
+      </div>
+
+      <div class="verse-panel" id="panelText">
+        <div class="draft-note">
+          <span>ℹ️</span>
+          <span>This gives a <b>quick draft translation</b> via the general translator above — it won't match the ESV's exact wording, since ESV is a specific licensed edition. For the official ESV text, use <b>By reference</b> instead.</span>
+        </div>
+        <textarea id="versePasteInput" style="height:140px;" placeholder="Paste an Indonesian Bible verse here, e.g. “Karena begitu besar kasih Allah akan dunia ini...”"></textarea>
+        <div style="margin-top:0.9rem;">
+          <button class="btn btn-clay" onclick="draftTranslateVerse()">Translate draft</button>
+        </div>
+        <div id="verseDraftResult" class="esv-result"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    BinahVox v2 · Built for CS Translate · Scripture text via the <a href="https://www.esv.org" target="_blank" rel="noopener">ESV® API</a>
+  </footer>
+
+<script>
+/* ============ General text/document translation ============ */
+
+function updateWordCount(){
+  const text = document.getElementById("sourceText").value.trim();
+  const count = text === "" ? 0 : text.split(/\s+/).length;
+  document.getElementById("wordsCurrent").innerText = count.toLocaleString();
+}
+
+function swapLanguages(){
+  const s = document.getElementById("sourceLang");
+  const t = document.getElementById("targetLang");
+  const tmp = s.value;
+  if([...t.options].some(o=>o.value===tmp) && [...s.options].some(o=>o.value===t.value)){
+    s.value = t.value;
+    t.value = tmp;
+  }
+}
+
+function copyOutput(){
+  const text = document.getElementById("targetOutput").value;
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = event.currentTarget;
+    const original = btn.innerText;
+    btn.innerText = "✓";
+    setTimeout(()=>btn.innerText = original, 1200);
+  });
+}
+
+let currentUtterance = null;
+function toggleListen(){
+  const btn = document.getElementById("listenBtn");
+  const text = document.getElementById("targetOutput").value.trim();
+  if(!window.speechSynthesis){
+    alert("Text-to-speech isn't supported in this browser.");
+    return;
+  }
+  if(speechSynthesis.speaking){
+    speechSynthesis.cancel();
+    btn.classList.remove("active");
+    return;
+  }
+  if(!text) return;
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = document.getElementById("targetLang").value;
+  currentUtterance.onend = () => btn.classList.remove("active");
+  btn.classList.add("active");
+  speechSynthesis.speak(currentUtterance);
+}
+
+/* ---- Document link loading ---- */
+function extractGoogleDocId(url){
+  const m = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+async function fetchOnlineDocLink(){
+  const url = document.getElementById("docUrlInput").value.trim();
+  const status = document.getElementById("linkStatus");
+  if(!url){ status.className = "field-hint error"; status.innerText = "Paste a document link first."; return; }
+
+  status.className = "field-hint";
+  status.innerText = "Loading…";
+
+  const docId = extractGoogleDocId(url);
+
+  try{
+    let text;
+    if(docId){
+      const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+      const res = await fetch(exportUrl);
+      if(!res.ok) throw new Error("not-shared");
+      text = await res.text();
+    } else {
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("fetch-failed");
+      text = await res.text();
+    }
+    document.getElementById("sourceText").value = text.trim();
+    updateWordCount();
+    status.className = "field-hint success";
+    status.innerText = "Document loaded.";
+  } catch(err){
+    status.className = "field-hint error";
+    status.innerText = docId
+      ? "Couldn't load this automatically. In Google Docs, go to Share → General access → “Anyone with the link,” then try again — or use File → Download → Plain text (.txt) and upload it below instead."
+      : "Couldn't load this link automatically (most services block direct access from other sites). Download the file and use “Choose .docx / .txt” below instead.";
+  }
+}
+
+/* ---- File upload (incl. drag & drop) ---- */
+const uploadZone = document.getElementById("uploadZone");
+["dragenter","dragover"].forEach(evt =>
+  uploadZone.addEventListener(evt, e => { e.preventDefault(); uploadZone.classList.add("drag-over"); })
+);
+["dragleave","drop"].forEach(evt =>
+  uploadZone.addEventListener(evt, e => { e.preventDefault(); uploadZone.classList.remove("drag-over"); })
+);
+uploadZone.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  if(file) handleFileUpload(file);
+});
+
+function handleFileUpload(file){
+  if(!file) return;
+  const nameDisplay = document.getElementById('fileNameDisplay');
+  const sourceTextarea = document.getElementById('sourceText');
+  nameDisplay.innerText = file.name;
+
+  if (file.name.endsWith(".txt")) {
+    const reader = new FileReader();
+    reader.onload = e => { sourceTextarea.value = e.target.result; updateWordCount(); };
+    reader.readAsText(file);
+  } else if (file.name.endsWith(".docx")) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      sourceTextarea.value = "Reading document…";
+      mammoth.extractRawText({arrayBuffer: e.target.result})
+        .then(result => { sourceTextarea.value = result.value; updateWordCount(); })
+        .catch(err => alert("Couldn't read this document: " + err.message));
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    alert("Please choose a .docx or .txt file.");
+  }
+}
+
+/* ---- Free Google Translate engine (no key required) ---- */
+async function translateChunk(text, sl, tl){
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  return data[0].map(item => item[0]).join('');
+}
+
+async function executeNoKeyTranslation(){
+  const textVal = document.getElementById("sourceText").value.trim();
+  const sl = document.getElementById("sourceLang").value;
+  const tl = document.getElementById("targetLang").value;
+  const btn = document.getElementById("translateBtn");
+  const output = document.getElementById("targetOutput");
+
+  if(!textVal){ alert("Add some text to translate first."); return; }
+
+  btn.disabled = true;
+  btn.innerText = "Translating…";
+  output.value = "Translating…";
+
+  try{
+    const paragraphs = textVal.split("\n");
+    let translatedParagraphs = [];
+
+    for (let para of paragraphs) {
+      if (para.trim() === "") { translatedParagraphs.push(""); continue; }
+      if (para.length > 1000) {
+        let sentences = para.match(/[^.!?]+[.!?]+(\s|$)/g) || [para];
+        let chunk = "", parts = [];
+        for (let sentence of sentences) {
+          if ((chunk + sentence).length > 1000) {
+            parts.push(await translateChunk(chunk, sl, tl));
+            chunk = sentence;
+          } else { chunk += sentence; }
+        }
+        if (chunk) parts.push(await translateChunk(chunk, sl, tl));
+        translatedParagraphs.push(parts.join(" "));
+      } else {
+        translatedParagraphs.push(await translateChunk(para, sl, tl));
+      }
+    }
+
+    output.value = translatedParagraphs.join("\n");
+    const wc = output.value.trim() === "" ? 0 : output.value.trim().split(/\s+/).length;
+    document.getElementById("targetWordCount").innerText = wc.toLocaleString() + " words";
+
+  } catch (error) {
+    console.error(error);
+    output.value = "A network error occurred while reaching the translation engine. Please try again.";
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "Translate text";
+  }
+}
+
+/* ============ Scripture lookup ============ */
+
+function switchVerseTab(tab){
+  document.getElementById("tabRef").classList.toggle("active", tab==="ref");
+  document.getElementById("tabText").classList.toggle("active", tab==="text");
+  document.getElementById("panelRef").classList.toggle("active", tab==="ref");
+  document.getElementById("panelText").classList.toggle("active", tab==="text");
+}
+
+const ID_BOOKS = {
+  "kejadian":"Genesis","keluaran":"Exodus","imamat":"Leviticus","bilangan":"Numbers","ulangan":"Deuteronomy",
+  "yosua":"Joshua","hakim-hakim":"Judges","rut":"Ruth","1 samuel":"1 Samuel","2 samuel":"2 Samuel",
+  "1 raja-raja":"1 Kings","2 raja-raja":"2 Kings","1 tawarikh":"1 Chronicles","2 tawarikh":"2 Chronicles",
+  "ezra":"Ezra","nehemia":"Nehemiah","ester":"Esther","ayub":"Job","mazmur":"Psalm","amsal":"Proverbs",
+  "pengkhotbah":"Ecclesiastes","kidung agung":"Song of Solomon","yesaya":"Isaiah","yeremia":"Jeremiah",
+  "ratapan":"Lamentations","yehezkiel":"Ezekiel","daniel":"Daniel","hosea":"Hosea","yoel":"Joel",
+  "amos":"Amos","obaja":"Obadiah","yunus":"Jonah","mikha":"Micah","nahum":"Nahum","habakuk":"Habakkuk",
+  "zefanya":"Zephaniah","hagai":"Haggai","zakharia":"Zechariah","maleakhi":"Malachi",
+  "matius":"Matthew","markus":"Mark","lukas":"Luke","yohanes":"John","kisah para rasul":"Acts","kisah":"Acts",
+  "roma":"Romans","1 korintus":"1 Corinthians","2 korintus":"2 Corinthians","galatia":"Galatians",
+  "efesus":"Ephesians","filipi":"Philippians","kolose":"Colossians","1 tesalonika":"1 Thessalonians",
+  "2 tesalonika":"2 Thessalonians","1 timotius":"1 Timothy","2 timotius":"2 Timothy","titus":"Titus",
+  "filemon":"Philemon","ibrani":"Hebrews","yakobus":"James","1 petrus":"1 Peter","2 petrus":"2 Peter",
+  "1 yohanes":"1 John","2 yohanes":"2 John","3 yohanes":"3 John","yudas":"Jude","wahyu":"Revelation"
+};
+
+function parseReference(raw){
+  raw = raw.trim().replace(/\s+/g," ");
+  const m = raw.match(/^(.*?)(\s+\d[\d:,\-\s]*)$/);
+  let bookPart = raw, versePart = "";
+  if (m) { bookPart = m[1].trim(); versePart = m[2].trim(); }
+  const englishBook = ID_BOOKS[bookPart.toLowerCase()] || bookPart;
+  return `${englishBook} ${versePart}`.trim();
+}
+
+function saveESVKey(){
+  const key = document.getElementById("esvApiKey").value.trim();
+  const status = document.getElementById("esvKeyStatus");
+  if(!key){ status.className="field-hint error"; status.innerText="Enter a key first."; return; }
+  localStorage.setItem("binahvox_esv_key", key);
+  status.className = "field-hint success";
+  status.innerText = "Saved in this browser.";
+}
+
+(function loadSavedESVKey(){
+  const saved = localStorage.getItem("binahvox_esv_key");
+  if(saved) document.getElementById("esvApiKey").value = saved;
+})();
+
+async function lookupESV(){
+  const raw = document.getElementById("verseRefInput").value.trim();
+  const resultBox = document.getElementById("esvResult");
+  if(!raw){ alert("Type a verse reference first, e.g. Yohanes 3:16"); return; }
+
+  const key = localStorage.getItem("binahvox_esv_key") || document.getElementById("esvApiKey").value.trim();
+  if(!key){
+    resultBox.style.display = "block";
+    resultBox.innerHTML = "Add a free ESV API key below to look up verses — see “ESV API key (one-time setup)”.";
+    return;
+  }
+
+  const reference = parseReference(raw);
+  resultBox.style.display = "block";
+  resultBox.innerText = "Looking up " + reference + "…";
+
+  try{
+    const url = `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-headings=false&include-footnotes=false&include-verse-numbers=true&include-short-copyright=false`;
+    const res = await fetch(url, { headers: { "Authorization": "Token " + key } });
+    if(!res.ok) throw new Error("api-error");
+    const data = await res.json();
+    if(!data.passages || data.passages.length === 0){
+      resultBox.innerText = `Couldn't find "${reference}" — double check the reference and try again.`;
+      return;
+    }
+    resultBox.innerHTML = data.passages.join("\n\n").trim() +
+      `<div class="esv-copyright">Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.</div>`;
+  } catch(err){
+    resultBox.innerHTML = "Couldn't reach the ESV API. Double-check your API key, or if this keeps happening, your browser may be blocking the cross-origin request — in that case the lookup needs to run through a small server-side proxy rather than directly from this page.";
+  }
+}
+
+async function draftTranslateVerse(){
+  const text = document.getElementById("versePasteInput").value.trim();
+  const resultBox = document.getElementById("verseDraftResult");
+  if(!text){ alert("Paste an Indonesian verse first."); return; }
+  resultBox.style.display = "block";
+  resultBox.innerText = "Translating…";
+  try{
+    const translated = await translateChunk(text, "id", "en");
+    resultBox.innerHTML = translated + `<div class="esv-copyright">Draft translation only — not official ESV wording. Use “By reference” for the authoritative ESV® text.</div>`;
+  } catch(err){
+    resultBox.innerText = "A network error occurred. Please try again.";
+  }
+}
+</script>
+</body>
+</html>
