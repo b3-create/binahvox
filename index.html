@@ -307,6 +307,9 @@
           <textarea id="sourceText" placeholder="Type or paste your text here — for example a customer message, an email thread, or a paragraph from a document." maxlength="100000" oninput="updateWordCount()"></textarea>
           <div class="field-foot">
             <span class="word-count"><span id="wordsCurrent">0</span> words</span>
+            <div class="output-actions">
+              <button class="btn btn-ghost btn-sm" onclick="clearSource()">Clear</button>
+            </div>
           </div>
         </div>
         <div class="field-block">
@@ -316,7 +319,7 @@
             <span class="word-count" id="targetWordCount"></span>
             <div class="output-actions">
               <button class="icon-btn" id="listenBtn" onclick="toggleListen()" title="Listen to translation">🔊</button>
-              <button class="icon-btn" onclick="copyOutput()" title="Copy translation">⧉</button>
+              <button class="btn btn-ghost btn-sm" id="copyBtn" onclick="copyOutput()">Copy</button>
             </div>
           </div>
         </div>
@@ -348,6 +351,13 @@
             <button class="btn btn-ghost btn-sm" onclick="saveESVKey()">Save key</button>
           </div>
           <div id="esvKeyStatus" class="field-hint"></div>
+
+          <p class="field-hint" style="margin-top:1rem;">Crossway's API is built for server calls, not for browsers calling it directly — most browsers block the request outright. If lookups fail, paste a proxy URL below (see the note under the results box for how to get one free in 5 minutes):</p>
+          <div class="api-key-row">
+            <input type="text" id="esvProxyUrl" placeholder="Optional: your proxy URL (e.g. https://your-worker.workers.dev)">
+            <button class="btn btn-ghost btn-sm" onclick="saveESVProxy()">Save proxy</button>
+          </div>
+          <div id="esvProxyStatus" class="field-hint"></div>
         </details>
       </div>
 
@@ -390,13 +400,23 @@ function swapLanguages(){
 
 function copyOutput(){
   const text = document.getElementById("targetOutput").value;
+  const btn = document.getElementById("copyBtn");
   if(!text) return;
   navigator.clipboard.writeText(text).then(()=>{
-    const btn = event.currentTarget;
     const original = btn.innerText;
-    btn.innerText = "✓";
+    btn.innerText = "Copied ✓";
     setTimeout(()=>btn.innerText = original, 1200);
   });
+}
+
+function clearSource(){
+  document.getElementById("sourceText").value = "";
+  document.getElementById("targetOutput").value = "";
+  document.getElementById("targetWordCount").innerText = "";
+  document.getElementById("fileNameDisplay").innerText = "or drop a file here";
+  document.getElementById("docUrlInput").value = "";
+  document.getElementById("linkStatus").innerText = "";
+  updateWordCount();
 }
 
 let currentUtterance = null;
@@ -597,9 +617,20 @@ function saveESVKey(){
   status.innerText = "Saved in this browser.";
 }
 
-(function loadSavedESVKey(){
-  const saved = localStorage.getItem("binahvox_esv_key");
-  if(saved) document.getElementById("esvApiKey").value = saved;
+function saveESVProxy(){
+  const url = document.getElementById("esvProxyUrl").value.trim().replace(/\/$/, "");
+  const status = document.getElementById("esvProxyStatus");
+  if(!url){ localStorage.removeItem("binahvox_esv_proxy"); status.innerText="Proxy cleared — will call the ESV API directly."; return; }
+  localStorage.setItem("binahvox_esv_proxy", url);
+  status.className = "field-hint success";
+  status.innerText = "Saved. Lookups will now go through your proxy.";
+}
+
+(function loadSavedESVSettings(){
+  const savedKey = localStorage.getItem("binahvox_esv_key");
+  if(savedKey) document.getElementById("esvApiKey").value = savedKey;
+  const savedProxy = localStorage.getItem("binahvox_esv_proxy");
+  if(savedProxy) document.getElementById("esvProxyUrl").value = savedProxy;
 })();
 
 async function lookupESV(){
@@ -614,14 +645,25 @@ async function lookupESV(){
     return;
   }
 
+  const proxy = localStorage.getItem("binahvox_esv_proxy") || document.getElementById("esvProxyUrl").value.trim().replace(/\/$/, "");
   const reference = parseReference(raw);
   resultBox.style.display = "block";
   resultBox.innerText = "Looking up " + reference + "…";
 
+  const query = `q=${encodeURIComponent(reference)}&include-headings=false&include-footnotes=false&include-verse-numbers=true&include-short-copyright=false`;
+  const targetUrl = proxy
+    ? `${proxy}/v3/passage/text/?${query}`
+    : `https://api.esv.org/v3/passage/text/?${query}`;
+
   try{
-    const url = `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-headings=false&include-footnotes=false&include-verse-numbers=true&include-short-copyright=false`;
-    const res = await fetch(url, { headers: { "Authorization": "Token " + key } });
-    if(!res.ok) throw new Error("api-error");
+    const res = await fetch(targetUrl, { headers: { "Authorization": "Token " + key } });
+
+    if(res.status === 401 || res.status === 403){
+      resultBox.innerHTML = "The API rejected this key — double-check you copied it correctly from your <a href=\"https://api.esv.org/account/create/\" target=\"_blank\" rel=\"noopener\">api.esv.org</a> account.";
+      return;
+    }
+    if(!res.ok) throw new Error("api-error " + res.status);
+
     const data = await res.json();
     if(!data.passages || data.passages.length === 0){
       resultBox.innerText = `Couldn't find "${reference}" — double check the reference and try again.`;
@@ -629,8 +671,11 @@ async function lookupESV(){
     }
     resultBox.innerHTML = data.passages.join("\n\n").trim() +
       `<div class="esv-copyright">Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.</div>`;
+
   } catch(err){
-    resultBox.innerHTML = "Couldn't reach the ESV API. Double-check your API key, or if this keeps happening, your browser may be blocking the cross-origin request — in that case the lookup needs to run through a small server-side proxy rather than directly from this page.";
+    resultBox.innerHTML = proxy
+      ? "Couldn't reach your proxy at that URL — double-check it's deployed and the address is correct."
+      : "The browser blocked this request — Crossway's ESV API doesn't allow direct calls from a webpage (no CORS support), only from servers. This isn't fixable in the page's own code. Add a free proxy URL under “ESV API key (one-time setup)” — deploying one takes about 5 minutes on Cloudflare Workers, and I can give you the exact code to paste in if you'd like.";
   }
 }
 
