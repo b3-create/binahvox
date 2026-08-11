@@ -434,6 +434,37 @@ function clearSource(){
   updateWordCount();
 }
 
+/* Browsers often default to a low-quality voice for a language even when a
+   noticeably better one is installed. Actively pick the best available match
+   instead of leaving it to whatever loads first. */
+let cachedVoices = [];
+function refreshVoiceCache(){ cachedVoices = speechSynthesis.getVoices(); }
+if(window.speechSynthesis){
+  refreshVoiceCache();
+  speechSynthesis.onvoiceschanged = refreshVoiceCache;
+}
+
+const PREFERRED_VOICE_NAMES = {
+  "en": ["Google US English", "Samantha", "Microsoft Aria Online (Natural) - English (United States)", "Microsoft Guy Online (Natural) - English (United States)", "Alex", "Google UK English Female"],
+  "id": ["Google Bahasa Indonesia", "Damayanti", "Microsoft Andika Online (Natural) - Indonesian (Indonesia)"],
+  "zh-CN": ["Google 普通话（中国大陆）", "Tingting", "Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)"]
+};
+
+function pickBestVoice(langCode){
+  if(cachedVoices.length === 0) refreshVoiceCache();
+  const langPrefix = langCode.split("-")[0];
+  const candidates = cachedVoices.filter(v => v.lang && v.lang.toLowerCase().startsWith(langPrefix));
+  if(candidates.length === 0) return null;
+
+  const preferred = PREFERRED_VOICE_NAMES[langCode] || [];
+  for(const name of preferred){
+    const match = candidates.find(v => v.name === name);
+    if(match) return match;
+  }
+  const googleVoice = candidates.find(v => v.name.includes("Google") || v.name.includes("Natural"));
+  return googleVoice || candidates[0];
+}
+
 let currentUtterance = null;
 function toggleListen(){
   const btn = document.getElementById("listenBtn");
@@ -448,8 +479,11 @@ function toggleListen(){
     return;
   }
   if(!text) return;
+  const targetLang = document.getElementById("targetLang").value;
   currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = document.getElementById("targetLang").value;
+  currentUtterance.lang = targetLang;
+  const bestVoice = pickBestVoice(targetLang);
+  if(bestVoice) currentUtterance.voice = bestVoice;
   currentUtterance.onend = () => btn.classList.remove("active");
   btn.classList.add("active");
   speechSynthesis.speak(currentUtterance);
