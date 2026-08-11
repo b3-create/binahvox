@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
   :root{
     color-scheme: light;
@@ -267,7 +266,7 @@
   <main>
     <section class="section-card" id="translate">
       <div class="section-head"><span class="tag">01</span><h2>Document &amp; Text Translation</h2></div>
-      <p class="section-sub">Paste text, upload a file, pull in a document link, or scan photos of a page — then translate instantly, no sign-in required.</p>
+      <p class="section-sub">Paste text, upload a file, or pull in a document link — then translate instantly, no sign-in required.</p>
 
       <div class="upload-zone" id="uploadZone">
         <div class="upload-row">
@@ -285,14 +284,6 @@
           <button class="btn btn-clay btn-sm" onclick="document.getElementById('fileAttachment').click()">Choose .docx / .txt</button>
           <span id="fileNameDisplay" style="font-size:0.85rem; color:var(--ink-muted);">or drop a file here</span>
         </div>
-        <div class="divider"></div>
-        <div class="upload-row">
-          <label class="field-label">📷 Scan a photo</label>
-          <input type="file" id="photoInput" accept="image/*" multiple capture="environment" class="file-input-hidden" onchange="handleImageOCR(this.files)">
-          <button class="btn btn-clay btn-sm" id="scanBtn" onclick="document.getElementById('photoInput').click()">Choose or take photo(s)</button>
-          <span style="font-size:0.85rem; color:var(--ink-muted);">book pages, screenshots, signs — select several for multiple pages</span>
-        </div>
-        <div id="ocrStatus" class="field-hint">Works best with a flat, well-lit, in-focus shot. Recognizes Indonesian and English text.</div>
       </div>
 
       <div class="control-bar">
@@ -440,67 +431,7 @@ function clearSource(){
   document.getElementById("fileNameDisplay").innerText = "or drop a file here";
   document.getElementById("docUrlInput").value = "";
   document.getElementById("linkStatus").innerText = "";
-  document.getElementById("ocrStatus").className = "field-hint";
-  document.getElementById("ocrStatus").innerText = "Works best with a flat, well-lit, in-focus shot. Recognizes Indonesian and English text.";
   updateWordCount();
-}
-
-/* ---- Photo scan (OCR) ---- */
-let ocrWorkerPromise = null;
-
-function getOCRWorker(status){
-  if(!ocrWorkerPromise){
-    status.innerText = "Loading text-recognition engine (first time only, ~10 seconds)…";
-    ocrWorkerPromise = Tesseract.createWorker('ind+eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          status.innerText = `Reading photo… ${Math.round(m.progress * 100)}%`;
-        }
-      }
-    });
-  }
-  return ocrWorkerPromise;
-}
-
-async function handleImageOCR(fileList){
-  if(!fileList || fileList.length === 0) return;
-  const status = document.getElementById('ocrStatus');
-  const scanBtn = document.getElementById('scanBtn');
-  const files = Array.from(fileList);
-
-  scanBtn.disabled = true;
-  status.className = 'field-hint';
-
-  try{
-    const worker = await getOCRWorker(status);
-    let pages = [];
-
-    for(let i = 0; i < files.length; i++){
-      status.innerText = `Reading photo ${i + 1} of ${files.length}…`;
-      const { data: { text } } = await worker.recognize(files[i]);
-      pages.push(text.trim());
-    }
-
-    const combined = pages.join('\n\n— — —\n\n');
-    document.getElementById('sourceText').value = combined;
-    document.getElementById('fileNameDisplay').innerText =
-      files.length === 1 ? files[0].name : `${files.length} photos scanned`;
-    updateWordCount();
-
-    status.className = 'field-hint success';
-    status.innerText = `Extracted text from ${files.length} photo${files.length > 1 ? 's' : ''} — translating…`;
-
-    await executeNoKeyTranslation();
-
-    status.innerText = `Done — scanned and translated ${files.length} photo${files.length > 1 ? 's' : ''}. Check the extracted text for any misreads before relying on it.`;
-
-  } catch(err){
-    console.error(err);
-    status.className = 'field-hint error';
-    status.innerText = "Couldn't read that photo clearly. Try a flatter angle, better lighting, or cropping closer to the text, then scan again.";
-  } finally {
-    scanBtn.disabled = false;
-  }
 }
 
 let currentUtterance = null;
