@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
 <title>BinahVox — CS Translate v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
   :root{
+    color-scheme: light;
     --bg:#FAF9F6;
     --surface:#FFFFFF;
     --ink:#1C1B22;
@@ -300,7 +302,7 @@
           <option value="en">English</option>
           <option value="zh-CN">Mandarin</option>
         </select>
-        <button class="swap-btn" onclick="swapLanguages()" title="Swap languages">⇄</button>
+        <button class="swap-btn" onclick="swapLanguages()" title="Swap languages" aria-label="Swap source and target languages">⇄</button>
         <label>To</label>
         <select id="targetLang">
           <option value="en" selected>English</option>
@@ -327,7 +329,7 @@
           <div class="field-foot">
             <span class="word-count" id="targetWordCount"></span>
             <div class="output-actions">
-              <button class="icon-btn" id="listenBtn" onclick="toggleListen()" title="Listen to translation">🔊</button>
+              <button class="icon-btn" id="listenBtn" onclick="toggleListen()" title="Listen to translation" aria-label="Listen to translation">🔊</button>
               <button class="btn btn-ghost btn-sm" id="copyBtn" onclick="copyOutput()">Copy</button>
             </div>
           </div>
@@ -391,9 +393,22 @@
 <script>
 /* ============ General text/document translation ============ */
 
+function countText(text, langCode){
+  text = text.trim();
+  if(!text) return 0;
+  if(langCode === "zh-CN"){
+    return text.replace(/\s+/g, "").length;
+  }
+  return text.split(/\s+/).length;
+}
+
+function unitLabel(langCode){
+  return langCode === "zh-CN" ? "characters" : "words";
+}
+
 function updateWordCount(){
-  const text = document.getElementById("sourceText").value.trim();
-  const count = text === "" ? 0 : text.split(/\s+/).length;
+  const sl = document.getElementById("sourceLang").value;
+  const count = countText(document.getElementById("sourceText").value, sl);
   document.getElementById("wordsCurrent").innerText = count.toLocaleString();
 }
 
@@ -594,44 +609,128 @@ async function translateChunk(text, sl, tl){
   return data[0].map(item => item[0]).join('');
 }
 
+/* ---- Smart formatting: clean up messy/wrapped text, preserve good formatting ---- */
+function mergeWrappedLines(lines){
+  let out = "";
+  for(const line of lines){
+    if(out.endsWith("-") && /^[a-z]/i.test(line)){
+      out = out.slice(0, -1) + line;           // de-hyphenate a word broken across a line wrap
+    } else if(out.length > 0){
+      out += " " + line;
+    } else {
+      out = line;
+    }
+  }
+  return out;
+}
+
+function smartReflow(text){
+  text = text.replace(/\r\n?/g, "\n");
+  const paragraphGroups = text.split(/\n\s*\n+/);
+
+  const cleaned = paragraphGroups.map(group => {
+    const lines = group.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    if(lines.length === 0) return "";
+    if(lines.length === 1) return lines[0];
+
+    const listLikeCount = lines.filter(l => /^([-*•]|\d+[.)])\s+/.test(l)).length;
+    if(listLikeCount / lines.length >= 0.5){
+      return lines.join("\n");                 // treat as a list — keep each item on its own line
+    }
+
+    const endsWithPunctRatio = lines.filter(l => /[.!?:;,'")”’]$/.test(l)).length / lines.length;
+    if(endsWithPunctRatio >= 0.8){
+      return lines.join("\n");                  // each line reads like a deliberate, complete statement (poem, address, notes) — leave as-is
+    }
+    return mergeWrappedLines(lines);             // default: treat as hard-wrapped prose (OCR, pasted PDF) — merge into a flowing paragraph
+  });
+
+  return cleaned.filter(c => c.length > 0).join("\n\n");
+}
+
+/* Translate a batch of flowing paragraphs in one request, joined by a delimiter.
+   Falls back to translating them one at a time if the delimiter doesn't survive. */
+async function translateBatch(paragraphs, sl, tl){
+  if(paragraphs.length === 1) return [await translateChunk(paragraphs[0], sl, tl)];
+  const DELIM = "|||";
+  const joined = paragraphs.join(`\n${DELIM}\n`);
+  const translated = await translateChunk(joined, sl, tl);
+  const pieces = translated.split(/\|\s*\|\s*\|/).map(p => p.trim());
+  if(pieces.length === paragraphs.length){
+    return pieces;
+  }
+  // Fallback: translate individually so nothing gets silently dropped or merged
+  const results = [];
+  for(const p of paragraphs) results.push(await translateChunk(p, sl, tl));
+  return results;
+}
+
+async function translateLongParagraph(paragraph, sl, tl){
+  const sentences = paragraph.match(/[^.!?]+[.!?]+(\s|$)/g) || [paragraph];
+  let chunk = "", parts = [];
+  for(const sentence of sentences){
+    if((chunk + sentence).length > 1000){
+      parts.push(await translateChunk(chunk, sl, tl));
+      chunk = sentence;
+    } else {
+      chunk += sentence;
+    }
+  }
+  if(chunk) parts.push(await translateChunk(chunk, sl, tl));
+  return parts.join(" ");
+}
+
 async function executeNoKeyTranslation(){
-  const textVal = document.getElementById("sourceText").value.trim();
+  const rawText = document.getElementById("sourceText").value.trim();
   const sl = document.getElementById("sourceLang").value;
   const tl = document.getElementById("targetLang").value;
   const btn = document.getElementById("translateBtn");
   const output = document.getElementById("targetOutput");
 
-  if(!textVal){ alert("Add some text to translate first."); return; }
+  if(!rawText){ alert("Add some text to translate first."); return; }
 
   btn.disabled = true;
   btn.innerText = "Translating…";
   output.value = "Translating…";
 
   try{
-    const paragraphs = textVal.split("\n");
-    let translatedParagraphs = [];
+    const blocks = smartReflow(rawText).split(/\n\n+/).filter(b => b.length > 0);
+    const outParts = [];
+    let batch = [];
+    let batchLen = 0;
 
-    for (let para of paragraphs) {
-      if (para.trim() === "") { translatedParagraphs.push(""); continue; }
-      if (para.length > 1000) {
-        let sentences = para.match(/[^.!?]+[.!?]+(\s|$)/g) || [para];
-        let chunk = "", parts = [];
-        for (let sentence of sentences) {
-          if ((chunk + sentence).length > 1000) {
-            parts.push(await translateChunk(chunk, sl, tl));
-            chunk = sentence;
-          } else { chunk += sentence; }
+    const flushBatch = async () => {
+      if(batch.length === 0) return;
+      const translated = await translateBatch(batch, sl, tl);
+      outParts.push(...translated);
+      batch = []; batchLen = 0;
+    };
+
+    for(const block of blocks){
+      const isList = block.includes("\n");
+
+      if(isList){
+        await flushBatch();
+        const lines = block.split("\n");
+        const translatedLines = [];
+        for(const line of lines){
+          translatedLines.push(line.trim() === "" ? "" : await translateChunk(line, sl, tl));
         }
-        if (chunk) parts.push(await translateChunk(chunk, sl, tl));
-        translatedParagraphs.push(parts.join(" "));
+        outParts.push(translatedLines.join("\n"));
+      } else if(block.length > 1000){
+        await flushBatch();
+        outParts.push(await translateLongParagraph(block, sl, tl));
       } else {
-        translatedParagraphs.push(await translateChunk(para, sl, tl));
+        if(batchLen + block.length > 1800) await flushBatch();
+        batch.push(block);
+        batchLen += block.length;
       }
     }
+    await flushBatch();
 
-    output.value = translatedParagraphs.join("\n");
-    const wc = output.value.trim() === "" ? 0 : output.value.trim().split(/\s+/).length;
-    document.getElementById("targetWordCount").innerText = wc.toLocaleString() + " words";
+    output.value = outParts.join("\n\n");
+    const count = countText(output.value, tl);
+    document.getElementById("targetWordCount").innerText = count.toLocaleString() + " " + unitLabel(tl);
 
   } catch (error) {
     console.error(error);
